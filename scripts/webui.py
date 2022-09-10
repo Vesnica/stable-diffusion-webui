@@ -969,10 +969,11 @@ def process_images(
             if opt.optimized:
                 modelFS.to(device)
 
-            for i in range(len(samples_ddim)):
-                x_samples_ddim = (model if not opt.optimized else modelFS).decode_first_stage(samples_ddim[i].unsqueeze(0))
-                x_sample = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
 
+
+            x_samples_ddim = (model if not opt.optimized else modelFS).decode_first_stage(samples_ddim)
+            x_samples_ddim = torch.clamp((x_samples_ddim + 1.0) / 2.0, min=0.0, max=1.0)
+            for i, x_sample in enumerate(x_samples_ddim):
                 sanitized_prompt = prompts[i].replace(' ', '_').translate({ord(x): '' for x in invalid_filename_chars})
                 if variant_seed != None and variant_seed != '':
                     if variant_amount == 0.0:
@@ -1004,7 +1005,7 @@ def process_images(
                 filename = filename.replace("[SEED]", seed_used)
                 filename = filename.replace("[VARIANT_AMOUNT]", f"{cur_variant_amount:.2f}")
 
-                x_sample = 255. * rearrange(x_sample[0].cpu().numpy(), 'c h w -> h w c')
+                x_sample = 255. * rearrange(x_sample.cpu().numpy(), 'c h w -> h w c')
                 x_sample = x_sample.astype(np.uint8)
                 metadata = ImageMetadata(prompt=prompts[i], seed=seeds[i], height=height, width=width, steps=steps,
                                     cfg_scale=cfg_scale, normalize_prompt_weights=normalize_prompt_weights, denoising_strength=denoising_strength,
@@ -2316,6 +2317,8 @@ class ServerLauncher(threading.Thread):
         }
         if not opt.share:
             demo.queue(concurrency_count=opt.max_jobs)
+            if os.environ.get('HTTP_PROXY') is not None: del os.environ['HTTP_PROXY']
+            if os.environ.get('HTTPS_PROXY') is not None: del os.environ['HTTPS_PROXY']
         if opt.share and opt.share_password:
             gradio_params['auth'] = ('webui', opt.share_password)
 
